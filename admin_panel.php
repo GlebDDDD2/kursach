@@ -55,6 +55,7 @@ $latestRequests = $pdo->query(
 
     <div class="d-flex gap-2 mb-4">
         <a href="add_property.php" class="btn btn-success">+ Добавить объект</a>
+        <a href="admin_requests.php" class="btn btn-outline-dark">Все заявки</a>
         <a href="catalog.php" class="btn btn-outline-primary">Открыть каталог</a>
     </div>
 

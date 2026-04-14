@@ -20,11 +20,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $user['username'];
             $_SESSION['user_role'] = $user['role'];
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 
             if ($user['role'] === 'admin') {
                 header('Location: admin_panel.php');
             } else {
-                header('Location: index.php');
+                header('Location: profile.php');
             }
             exit;
         }

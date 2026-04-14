@@ -28,6 +28,13 @@ if (!$photos && !empty($property['main_photo'])) {
         ['photo_path' => $property['main_photo']]
     ];
 }
+
+$userData = null;
+if (isset($_SESSION['user_id'])) {
+    $userStmt = $pdo->prepare('SELECT username, phone, email FROM users WHERE id = ?');
+    $userStmt->execute([(int)$_SESSION['user_id']]);
+    $userData = $userStmt->fetch();
+}
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -111,30 +118,37 @@ if (!$photos && !empty($property['main_photo'])) {
             <div class="card shadow-sm">
                 <div class="card-body">
                     <h2 class="h5 mb-3">Оставить заявку на просмотр</h2>
-                    <form method="POST" action="request_viewing.php">
-                        <input type="hidden" name="property_id" value="<?= (int)$property['id'] ?>">
-                        <div class="mb-3">
-                            <label class="form-label">Ваше имя</label>
-                            <input type="text" name="client_name" class="form-control" required>
+                    <?php if (!isset($_SESSION['user_id'])): ?>
+                        <div class="alert alert-warning mb-0">
+                            Чтобы отправить заявку, сначала <a href="login.php">войдите</a> или <a href="register.php">зарегистрируйтесь</a>.
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Телефон</label>
-                            <input type="text" name="client_phone" class="form-control" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Email</label>
-                            <input type="email" name="client_email" class="form-control">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Желаемая дата</label>
-                            <input type="date" name="preferred_date" class="form-control">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Комментарий</label>
-                            <textarea name="comment" class="form-control" rows="3"></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">Отправить заявку</button>
-                    </form>
+                    <?php else: ?>
+                        <form method="POST" action="request_viewing.php">
+                            <input type="hidden" name="csrf_token" value="<?= h(csrf_token()) ?>">
+                            <input type="hidden" name="property_id" value="<?= (int)$property['id'] ?>">
+                            <div class="mb-3">
+                                <label class="form-label">Ваше имя</label>
+                                <input type="text" name="client_name" class="form-control" value="<?= h($userData['username'] ?? '') ?>" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Телефон</label>
+                                <input type="text" name="client_phone" class="form-control" value="<?= h($userData['phone'] ?? '') ?>" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" name="client_email" class="form-control" value="<?= h($userData['email'] ?? '') ?>">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Желаемая дата</label>
+                                <input type="date" name="preferred_date" class="form-control">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Комментарий</label>
+                                <textarea name="comment" class="form-control" rows="3"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Отправить заявку</button>
+                        </form>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
