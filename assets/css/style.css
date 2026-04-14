@@ -1,0 +1,14 @@
+body {
+    min-height: 100vh;
+}
+
+.hero-section {
+    min-height: 420px;
+    background: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)),
+                url('https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat;
+}
+
+.property-thumb {
+    height: 220px;
+    object-fit: cover;
+}
