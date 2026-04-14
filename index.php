@@ -6,6 +6,7 @@ $stmt = $pdo->query(
     'SELECT p.*, d.name AS district_name
      FROM properties p
      JOIN districts d ON d.id = p.district_id
+     WHERE p.is_published = 1
      ORDER BY p.id DESC
      LIMIT 6'
 );
@@ -50,7 +51,7 @@ $properties = $stmt->fetchAll();
 <header class="hero-section text-white d-flex align-items-center">
     <div class="container text-center">
         <h1 class="display-4 fw-bold">Сайт агентства недвижимости</h1>
-        <p class="lead mb-4">Квартиры, дома, удобный фильтр, галерея фото и заявки на просмотр.</p>
+        <p class="lead mb-4">Квартиры, дома, удобный фильтр, слайдер фото, личный кабинет и заявки на просмотр.</p>
         <a href="catalog.php" class="btn btn-primary btn-lg">Открыть каталог</a>
     </div>
 </header>
@@ -76,8 +77,8 @@ $properties = $stmt->fetchAll();
         <div class="col-md-4">
             <div class="card h-100 shadow-sm">
                 <div class="card-body">
-                    <h2 class="h5">Заявки на просмотр</h2>
-                    <p class="mb-0">Клиенты могут оставить заявку на интересующий объект.</p>
+                    <h2 class="h5">Безопасная логика</h2>
+                    <p class="mb-0">RBAC, CSRF, защита от XSS и контроль доступа к заявкам.</p>
                 </div>
             </div>
         </div>
@@ -111,7 +112,7 @@ $properties = $stmt->fetchAll();
         <?php endforeach; ?>
 
         <?php if (!$properties): ?>
-            <p class="text-muted">Объекты пока не добавлены. Зайдите под админом и добавьте первый объект.</p>
+            <p class="text-muted">Объекты пока не добавлены или сняты с публикации.</p>
         <?php endif; ?>
     </div>
 </div>

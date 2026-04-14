@@ -7,11 +7,16 @@ if ($id <= 0) {
     die('Некорректный ID объекта.');
 }
 
-$stmt = $pdo->prepare('SELECT p.*, d.name AS district_name, r.full_name AS realtor_name, r.phone AS realtor_phone, r.email AS realtor_email
-                       FROM properties p
-                       JOIN districts d ON p.district_id = d.id
-                       JOIN realtors r ON p.realtor_id = r.id
-                       WHERE p.id = ?');
+$isAdmin = isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin';
+$sql = 'SELECT p.*, d.name AS district_name, r.full_name AS realtor_name, r.phone AS realtor_phone, r.email AS realtor_email
+        FROM properties p
+        JOIN districts d ON p.district_id = d.id
+        JOIN realtors r ON p.realtor_id = r.id
+        WHERE p.id = ?';
+if (!$isAdmin) {
+    $sql .= ' AND p.is_published = 1';
+}
+$stmt = $pdo->prepare($sql);
 $stmt->execute([$id]);
 $property = $stmt->fetch();
 
@@ -35,6 +40,8 @@ if (isset($_SESSION['user_id'])) {
     $userStmt->execute([(int)$_SESSION['user_id']]);
     $userData = $userStmt->fetch();
 }
+
+$mapQuery = rawurlencode($property['address']);
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -52,7 +59,7 @@ if (isset($_SESSION['user_id'])) {
             <a class="nav-link" href="index.php">Главная</a>
             <a class="nav-link" href="catalog.php">Каталог</a>
             <?php if (isset($_SESSION['user_id'])): ?>
-                <?php if (($_SESSION['user_role'] ?? '') === 'admin'): ?>
+                <?php if ($isAdmin): ?>
                     <a class="nav-link" href="admin_panel.php">Админка</a>
                 <?php endif; ?>
                 <a class="nav-link" href="profile.php">Профиль</a>
@@ -100,7 +107,12 @@ if (isset($_SESSION['user_id'])) {
         <div class="col-lg-5">
             <div class="card shadow-sm mb-4">
                 <div class="card-body">
-                    <h1 class="h3 mb-3"><?= h($property['title']) ?></h1>
+                    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                        <h1 class="h3 mb-0"><?= h($property['title']) ?></h1>
+                        <?php if ((int)$property['is_published'] !== 1): ?>
+                            <span class="badge bg-secondary">Скрыт</span>
+                        <?php endif; ?>
+                    </div>
                     <p class="mb-2"><strong>Тип:</strong> <?= $property['property_type'] === 'apartment' ? 'Квартира' : 'Дом' ?></p>
                     <p class="mb-2"><strong>Цена:</strong> <?= number_format((float)$property['price'], 0, ',', ' ') ?> ₽</p>
                     <p class="mb-2"><strong>Район:</strong> <?= h($property['district_name']) ?></p>
@@ -158,6 +170,18 @@ if (isset($_SESSION['user_id'])) {
         <div class="card-body">
             <h2 class="h5 mb-3">Описание объекта</h2>
             <p class="mb-0"><?= nl2br(h($property['description'])) ?></p>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mt-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="h5 mb-0">Расположение на карте</h2>
+                <a class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener noreferrer" href="https://yandex.ru/maps/?text=<?= $mapQuery ?>">Открыть в Яндекс.Картах</a>
+            </div>
+            <div class="ratio ratio-16x9 rounded overflow-hidden border">
+                <iframe src="https://yandex.ru/map-widget/v1/?text=<?= $mapQuery ?>&z=15" allowfullscreen loading="lazy"></iframe>
+            </div>
         </div>
     </div>
 </div>

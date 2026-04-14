@@ -2,26 +2,49 @@
 require 'db.php';
 require 'check_admin.php';
 
-$message = '';
+$id = (int)($_GET['id'] ?? 0);
+if ($id <= 0) {
+    die('Объект не найден.');
+}
+
 $districts = $pdo->query('SELECT id, name FROM districts ORDER BY name')->fetchAll();
 $realtors = $pdo->query('SELECT id, full_name FROM realtors ORDER BY full_name')->fetchAll();
+
+$stmt = $pdo->prepare('SELECT * FROM properties WHERE id = ? LIMIT 1');
+$stmt->execute([$id]);
+$property = $stmt->fetch();
+if (!$property) {
+    die('Объект не найден.');
+}
+
+$photosStmt = $pdo->prepare('SELECT photo_path FROM property_photos WHERE property_id = ? ORDER BY sort_order ASC, id ASC');
+$photosStmt->execute([$id]);
+$photoRows = $photosStmt->fetchAll();
+$galleryUrls = [];
+foreach ($photoRows as $photoRow) {
+    if ($photoRow['photo_path'] !== $property['main_photo']) {
+        $galleryUrls[] = $photoRow['photo_path'];
+    }
+}
+
 $formData = [
-    'title' => '',
-    'property_type' => 'apartment',
-    'district_id' => '',
-    'realtor_id' => '',
-    'address' => '',
-    'price' => '',
-    'floor' => '',
-    'total_floors' => '',
-    'area' => '',
-    'rooms' => '',
-    'description' => '',
-    'main_photo' => '',
-    'gallery_urls' => '',
-    'is_published' => 1,
+    'title' => $property['title'],
+    'property_type' => $property['property_type'],
+    'district_id' => $property['district_id'],
+    'realtor_id' => $property['realtor_id'],
+    'address' => $property['address'],
+    'price' => $property['price'],
+    'floor' => $property['floor'],
+    'total_floors' => $property['total_floors'],
+    'area' => $property['area'],
+    'rooms' => $property['rooms'],
+    'description' => $property['description'],
+    'main_photo' => $property['main_photo'],
+    'gallery_urls' => implode("\n", $galleryUrls),
+    'is_published' => $property['is_published'],
 ];
-$submitLabel = 'Сохранить объект';
+$message = '';
+$submitLabel = 'Обновить объект';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf_token($_POST['csrf_token'] ?? null)) {
@@ -37,28 +60,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $districtId = (int)$formData['district_id'];
         $realtorId = (int)$formData['realtor_id'];
-        $userId = (int)($_SESSION['user_id'] ?? 0);
         $propertyType = in_array($formData['property_type'], ['apartment', 'house'], true) ? $formData['property_type'] : '';
 
         if ($formData['title'] === '' || $districtId <= 0 || $realtorId <= 0 || $formData['address'] === '' || $formData['price'] === '' || $formData['area'] === '') {
-            $message = '<div class="alert alert-danger">Заполните обязательные поля: название, район, риелтор, адрес, цена и площадь.</div>';
+            $message = '<div class="alert alert-danger">Заполните обязательные поля.</div>';
         } elseif ($propertyType === '') {
             $message = '<div class="alert alert-danger">Некорректный тип объекта.</div>';
-        } elseif ($userId <= 0) {
-            $message = '<div class="alert alert-danger">Ошибка сессии. Войдите заново.</div>';
         } else {
-            $stmt = $pdo->prepare(
-                'INSERT INTO properties (title, property_type, district_id, realtor_id, user_id, address, price, floor, total_floors, area, rooms, description, main_photo, is_published)
-                 VALUES (:title, :property_type, :district_id, :realtor_id, :user_id, :address, :price, :floor, :total_floors, :area, :rooms, :description, :main_photo, :is_published)'
+            $update = $pdo->prepare(
+                'UPDATE properties
+                 SET title = :title,
+                     property_type = :property_type,
+                     district_id = :district_id,
+                     realtor_id = :realtor_id,
+                     address = :address,
+                     price = :price,
+                     floor = :floor,
+                     total_floors = :total_floors,
+                     area = :area,
+                     rooms = :rooms,
+                     description = :description,
+                     main_photo = :main_photo,
+                     is_published = :is_published
+                 WHERE id = :id'
             );
 
             try {
-                $stmt->execute([
+                $update->execute([
                     ':title' => $formData['title'],
                     ':property_type' => $propertyType,
                     ':district_id' => $districtId,
                     ':realtor_id' => $realtorId,
-                    ':user_id' => $userId,
                     ':address' => $formData['address'],
                     ':price' => $formData['price'],
                     ':floor' => $formData['floor'] !== '' ? $formData['floor'] : null,
@@ -68,15 +100,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':description' => $formData['description'] !== '' ? $formData['description'] : null,
                     ':main_photo' => $formData['main_photo'] !== '' ? $formData['main_photo'] : null,
                     ':is_published' => $formData['is_published'],
+                    ':id' => $id,
                 ]);
 
-                $propertyId = (int)$pdo->lastInsertId();
+                $pdo->prepare('DELETE FROM property_photos WHERE property_id = ?')->execute([$id]);
                 $galleryLines = preg_split('/\r\n|\r|\n/', $formData['gallery_urls']);
                 $insertPhoto = $pdo->prepare('INSERT INTO property_photos (property_id, photo_path, sort_order) VALUES (?, ?, ?)');
                 $sort = 1;
 
                 if ($formData['main_photo'] !== '') {
-                    $insertPhoto->execute([$propertyId, $formData['main_photo'], $sort++]);
+                    $insertPhoto->execute([$id, $formData['main_photo'], $sort++]);
                 }
 
                 foreach ($galleryLines as $line) {
@@ -84,10 +117,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($line === '') {
                         continue;
                     }
-                    $insertPhoto->execute([$propertyId, $line, $sort++]);
+                    $insertPhoto->execute([$id, $line, $sort++]);
                 }
 
-                $_SESSION['success_message'] = 'Объект недвижимости успешно добавлен.';
+                $_SESSION['success_message'] = 'Объект обновлен.';
                 header('Location: admin_panel.php');
                 exit;
             } catch (PDOException $e) {
@@ -102,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Добавить объект</title>
+    <title>Редактировать объект</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
@@ -111,14 +144,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <a class="navbar-brand" href="index.php">Estate Agency</a>
         <div class="navbar-nav ms-auto">
             <a class="nav-link" href="admin_panel.php">Админка</a>
-            <a class="nav-link active" href="add_property.php">Добавить объект</a>
+            <a class="nav-link active" href="edit_property.php?id=<?= $id ?>">Редактирование</a>
             <a class="nav-link" href="logout.php">Выход</a>
         </div>
     </div>
 </nav>
 
 <div class="container py-4">
-    <h1 class="h3 mb-3">Добавление нового объекта</h1>
+    <h1 class="h3 mb-3">Редактирование объекта</h1>
     <a href="admin_panel.php" class="btn btn-outline-secondary mb-3">← Назад в админку</a>
 
     <?= $message ?>
